@@ -1,1 +1,67 @@
-ss
+
+
+/*********************************/
+data cr1_w1;set ea5_1;if review_flag = 1;if curr_score = upcomingsame_lscore;change= upcomingsame_cscore - upcomingsame_lscore;run;
+/* if downgrade */
+data cr1_w1_d1;set cr1_w1;if chg_score < 0;run;
+proc sql;create table cr1_w1_d2 as select distinct count(chg_score) as freq, mean(upcomingsame_1st_cr_dist) as mean_days,
+			sum(case when change>0 and upcomingsame_rf=0 then 1 else 0 end) as freq_up,
+			mean(case when change>0 and upcomingsame_rf=0 then upcomingsame_1st_cr_dist else . end) as mean_days_up,
+			sum(case when change<0 and upcomingsame_rf=0 then 1 else 0 end) as freq_down,
+			mean(case when change<0 and upcomingsame_rf=0 then upcomingsame_1st_cr_dist else . end) as mean_days_down,
+			sum(case when change=0 and upcomingsame_rf=0 then 1 else 0 end) as freq_affirm,
+			mean(case when change=0 and upcomingsame_rf=0 then upcomingsame_1st_cr_dist else . end) as mean_days_affirm,
+			sum(case when  upcomingsame_rf>0 then 1 else 0 end) as freq_watch,
+			mean(case when  upcomingsame_rf>0 then upcomingsame_1st_cr_dist else . end) as mean_days_watch from cr1_w1_d1; quit;
+/* if upgradegrade */
+data cr1_w1_u1;	set cr1_w1;	if chg_score > 0;run;
+proc sql; create table cr1_w1_u2 as select distinct count(chg_score) as freq, mean(upcomingsame_1st_cr_dist) as mean_days,
+			sum(case when change>0 and upcomingsame_rf=0 then 1 else 0 end) as freq_up,
+			mean(case when change>0 and upcomingsame_rf=0 then upcomingsame_1st_cr_dist else . end) as mean_days_up,
+			sum(case when change<0 and upcomingsame_rf=0 then 1 else 0 end) as freq_down,
+			mean(case when change<0 and upcomingsame_rf=0 then upcomingsame_1st_cr_dist else . end) as mean_days_down,
+			sum(case when change=0 and upcomingsame_rf=0 then 1 else 0 end) as freq_affirm,
+			mean(case when change=0 and upcomingsame_rf=0 then upcomingsame_1st_cr_dist else . end) as mean_days_affirm,
+			sum(case when  upcomingsame_rf>0 then 1 else 0 end) as freq_watch,
+			mean(case when  upcomingsame_rf>0 then upcomingsame_1st_cr_dist else . end) as mean_days_watch from cr1_w1_u1; quit;
+data cr1_w2;  set cr1_w1_d2 (in=x1) cr1_w1_u2 (in=x2);  array xx{2} x1-x2; do i=1 to 2; if xx{i} then xxx= i; end; drop i; run;
+data cr1_w3; set cr1_w2;
+	freq1= strip(put(round(freq,1), comma20.));
+	mean_days1= strip(put(round(mean_days,1), comma20.));
+	freq_up1= strip(put(round(freq_up,1), comma20.));
+	mean_days_up1= strip(put(round(mean_days_up,1), comma20.));
+	freq_down1= strip(put(round(freq_down,1), comma20.));
+	mean_days_down1= strip(put(round(mean_days_down,1), comma20.));
+	freq_affirm1= strip(put(round(freq_affirm,1), comma20.));
+	mean_days_affirm1= strip(put(round(mean_days_affirm,1), comma20.));
+	freq_watch1= strip(put(round(freq_watch,1), comma20.));
+	mean_days_watch1= strip(put(round(mean_days_watch,1), comma20.));
+	drop freq mean_days freq_up mean_days_up freq_down mean_days_down freq_affirm mean_days_affirm freq_watch mean_days_watch;run;
+data cr1_w4;set cr1_w3;length var $100.;if xxx=1 then do; rank=1; var="Negative Watch"; varp= ""; end;if xxx=2 then do; rank=2; 
+var="Positive Watch"; varp= " "; end;run;
+proc sort data= cr1_w4 out= cr1_w5; by rank; run;
+/* Export to MS word */
+	ods listing close;
+   ods rtf file='\\path\Intervals after credit watch.rtf'  style=styles.word;
+   ods path(prepend) work.templat(update);
+options orientation=landscape;
+proc report nowd data= cr1_w5 headline style(report)={frame=hsides};
+	title1 "Intervals after credit watch";
+	col var freq1 mean_days1 varp ("Upgrade" freq_up1 mean_days_up1) varp ("Downgrade" freq_down1 mean_days_down1) varp 
+			("Affirmation" freq_affirm1 mean_days_affirm1) varp ("Credit-watch"freq_watch1 mean_days_watch1);
+	define var/ display " " left style(header)=[just=l] ;
+	define freq1/ display "Freqency" center;
+	define mean_days1 / display "Days to upcoming announcement" center;
+	define varp/ display " "; 
+	define freq_up1 / display "Frequency of upcoming upgrade" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+	define mean_days_up1/ display "Days to upcoming upgrade" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+	define freq_down1 / display "Frequency of upcoming downgrade" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+	define mean_days_down1/ display "Days to upcoming downgrade" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+	define freq_affirm1 / display "Frequency of upcoming affirmation" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+	define mean_days_affirm1/ display "Days to upcoming affirmation" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+	define freq_watch1 / display "Frequency of upcoming credit-watch" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+	define mean_days_watch1/ display "Days to upcoming credit-watch" center style(header)=[bordertopwidth=1pt bordertopcolor=black];
+run;
+   ods rtf close;
+   title1;
+
